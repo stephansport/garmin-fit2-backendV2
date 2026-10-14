@@ -11,7 +11,6 @@ function normalizeFitData(data) {
 
   const recordsSource = rootRecords.length ? rootRecords : nestedRecords;
   const records = recordsSource.map(mapRecord);
-  const maxMeanPower = computeMaxMeanPower(records);
 
   return {
     fileId: data?.file_id || activity?.file_id || null,
@@ -26,8 +25,7 @@ function normalizeFitData(data) {
     avgSpeed: numberOrNull(session?.avg_speed),
     avgHeartRate: numberOrNull(session?.avg_heart_rate),
     avgPower: numberOrNull(session?.avg_power),
-    records,
-    maxMeanPower  // NEU
+    records
   };
 }
 
@@ -62,6 +60,7 @@ function mapRecord(record) {
   return {
     timestamp: record?.timestamp || null,
     elapsed_time: numberOrNull(record?.elapsed_time),
+    timer_time: numberOrNull(record?.timer_time),
     distance: numberOrNull(record?.distance),
 
     // NEU: Fallback auf enhanced_*
@@ -106,73 +105,6 @@ function numberOrNull(value) {
 
 function arrayOrEmpty(value) {
   return Array.isArray(value) ? value : [];
-}
-
-function computeMaxMeanPower(records, targetDurations = [60, 300, 600, 1200, 3600]) {
-  // targetDurations in Sekunden: [1min, 5min, 10min, 20min, 60min]
-  const powerRecords = records.filter(r =>
-    r.power != null &&
-    r.power > 0 &&
-    r.elapsed_time != null
-  );
-
-  if (powerRecords.length < 2) return {};
-
-  const result = {};
-
-  for (const targetSeconds of targetDurations) {
-    let maxAvg = 0;
-    let bestStartIdx = 0;
-    let bestEndIdx = 0;
-
-    for (let i = 0; i < powerRecords.length; i++) {
-      const startTime = powerRecords[i].elapsed_time;
-      const endTime = startTime + targetSeconds;
-
-      // Finde alle Records in diesem Zeitfenster
-      const windowRecords = [];
-      for (let j = i; j < powerRecords.length; j++) {
-        if (powerRecords[j].elapsed_time >= startTime &&
-          powerRecords[j].elapsed_time < endTime) {
-          windowRecords.push(powerRecords[j]);
-        }
-        if (powerRecords[j].elapsed_time >= endTime) break;
-      }
-
-      // Mindestens 80% der erwarteten Dauer erfüllt
-      if (windowRecords.length > 0) {
-        const actualDuration =
-          windowRecords[windowRecords.length - 1].elapsed_time -
-          windowRecords[0].elapsed_time;
-
-        if (actualDuration >= targetSeconds * 0.8) {
-          const avgPower = windowRecords.reduce((sum, r) => sum + r.power, 0) / windowRecords.length;
-
-          if (avgPower > maxAvg) {
-            maxAvg = avgPower;
-            bestStartIdx = i;
-            bestEndIdx = i + windowRecords.length - 1;
-          }
-        }
-      }
-    }
-
-    if (maxAvg > 0) {
-      const label = targetSeconds < 60
-        ? `${targetSeconds}s`
-        : `${Math.floor(targetSeconds / 60)}min`;
-
-      result[label] = {
-        watts: Math.round(maxAvg),
-        startIndex: bestStartIdx,
-        endIndex: bestEndIdx,
-        startTime: powerRecords[bestStartIdx]?.elapsed_time,
-        endTime: powerRecords[bestEndIdx]?.elapsed_time
-      };
-    }
-  }
-
-  return result;
 }
 
 module.exports = { normalizeFitData };

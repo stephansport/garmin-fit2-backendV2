@@ -17,14 +17,7 @@ app.get('/health', (_req, res) => {
 });
 
 app.post('/api/parse-fit', upload.single('file'), (req, res) => {
-  console.log('--- /api/parse-fit aufgerufen ---');
-
   try {
-    console.log('Datei vorhanden:', !!req.file);
-    console.log('Dateiname:', req.file?.originalname);
-    console.log('Dateigröße:', req.file?.size);
-    console.log('Buffer vorhanden:', !!req.file?.buffer);
-
     if (!req.file || !req.file.buffer) {
       console.error('Keine Datei oder kein Buffer vorhanden');
       return res.status(400).json({ error: 'Keine FIT-Datei hochgeladen.' });
@@ -40,8 +33,6 @@ app.post('/api/parse-fit', upload.single('file'), (req, res) => {
     });
 
     fitParser.parse(req.file.buffer, (error, data) => {
-      console.log('Parser-Callback erreicht');
-
       if (error) {
         console.error('Parserfehler:', error);
         return res.status(400).json({
@@ -50,19 +41,7 @@ app.post('/api/parse-fit', upload.single('file'), (req, res) => {
       }
 
       try {
-        console.log('Parser data keys:', Object.keys(data || {}));
-        console.log('Sessions:', data?.sessions?.length);
-        console.log('Records:', data?.records?.length);
-        console.log('First raw record:', data?.records?.[0]);
-
         const normalized = normalizeFitData(data);
-
-        console.log('Normalized keys:', Object.keys(normalized || {}));
-        console.log('Normalized record count:', normalized?.records?.length);
-        console.log('First normalized record:', normalized?.records?.[0]);
-        console.log('maxMeanPower:', normalized?.maxMeanPower);
-        console.log('maxMeanPower keys:', Object.keys(normalized?.maxMeanPower || {}));
-        
         return res.json(normalized);
       } catch (innerError) {
         console.error('Fehler in normalizeFitData oder danach:', innerError);
